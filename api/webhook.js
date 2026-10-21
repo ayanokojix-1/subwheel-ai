@@ -1,5 +1,6 @@
 // Telegram webhook entry point (Vercel serverless function).
 const { redis } = require("../lib/store");
+const db = require("../lib/db");
 const telegram = require("../lib/telegram");
 const { isAuthorized, isAdmin, login, logout } = require("../lib/auth");
 const { chat, noteEvent, clearHistory } = require("../lib/agent");
@@ -95,13 +96,20 @@ async function handleCallback(cb) {
   await telegram.answerCallback(cb.id, "Processing…");
   await telegram.editMessage(chatId, messageId, `⏳ Processing: ${summary}`);
 
+  // Logged before calling GSubz, so a crash mid-purchase still leaves a
+  // "processing" row to reconcile.
+  await db.startPurchase(id, cb.from.id, pending);
   const result = await buyData({ serviceID: pending.serviceID, planID: pending.planID, phone: pending.phone, requestID: id });
+  await db.finishPurchase(id, result).catch((e) => console.error("finishPurchase failed", id, e));
 
   let text;
   if (result.outcome === "success") {
     text = `✅ Done! ${summary}\nRef: ${result.transactionID}`;
   } else if (result.outcome === "failed") {
-    text = `❌ Purchase failed: ${summary}\n${result.message || ""}\nYou were not charged. You can try again.`;
+    const reason = /INSUFFICIENT/i.test(result.message || "")
+      ? "The service is temporarily unable to process purchases. Please contact the admin."
+      : result.message || "";
+    text = `❌ Purchase failed: ${summary}\n${reason}\nYou were not charged. You can try again.`;
   } else {
     text = `⚠️ We couldn't confirm the outcome of: ${summary}\nPlease don't retry yet. Ref: ${id}\nCheck with the admin first.`;
     console.error("UNKNOWN purchase outcome", id, result.message);
