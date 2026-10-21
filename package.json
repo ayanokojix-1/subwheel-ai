@@ -1,0 +1,16 @@
+{
+  "name": "subwheel-ai",
+  "version": "1.0.0",
+  "description": "Telegram bot that lists and sells data plans via GSubz, powered by Gemini",
+  "main": "api/webhook.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "A-Y-A-N-O-K-O-J-I",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^2.16.0",
+    "@upstash/redis": "^1.39.0",
+    "dotenv": "^17.4.2"
+  }
+}
